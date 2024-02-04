@@ -132,7 +132,7 @@ def remove_book():
     result = cursor.fetchone()
     if result:
         # Book found, proceed with deletion, commit changes and print deletion confirmation to the user
-        cursor.execute('DELETE FROM books WHERE id = ?', (book_id,))
+        cursor.execute('DELETE FROM books WHERE book_id = ?', (book_id,))
         connect.commit()
         print("Book removed from the database")
     else:
@@ -153,9 +153,9 @@ def update_book_quantity():
     ''', (book_id,))
     # Fetch Result from SELECT query to check if book id exists in table
     result = cursor.fetchone()
-    # User input for new book quantity
-    new_quantity = get_integer_input("Please Enter New Quantity: ")
     if result:
+        # User input for new book quantity
+        new_quantity = get_integer_input("Please Enter New Quantity: ")
         # Update the quantity of the specified book
         cursor.execute("UPDATE books SET quantity = ? WHERE book_id = ?", (new_quantity, book_id))
         print(f"Quantity for {result[0]} updated to: {new_quantity}.")
@@ -185,7 +185,7 @@ def update_book_information():
         cursor.execute('''
             UPDATE books
             SET title = ?, author = ?, isbn = ?, pub_date = ?, genre = ?
-            WHERE id = ?
+            WHERE book_id = ?
             ''', (new_title, new_author, new_isbn, new_pub_date, new_genre, book_id))
         print(f"Information for {result[1]} updated.")
     else:
