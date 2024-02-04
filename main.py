@@ -128,17 +128,25 @@ def remove_book():
     connect, cursor = database_connection()
     book_id = get_integer_input("Please Enter Book ID: ")
     # Check if the book with the specified ID exists
-    cursor.execute('SELECT * FROM books WHERE book_id = ?', (book_id,))
+    cursor.execute('SELECT title FROM books WHERE book_id = ?', (book_id,))
     result = cursor.fetchone()
     if result:
-        # Book found, proceed with deletion, commit changes and print deletion confirmation to the user
-        cursor.execute('DELETE FROM books WHERE book_id = ?', (book_id,))
-        connect.commit()
-        print("Book removed from the database")
-    else:
+        while True:
+            print(f"Please confirm removal of: {result[0]}\n 0: No, 1: Yes")
         # Error handling for book not found in table
-        print(f"No book found with ID: {book_id}")
-
+            user_choice = get_integer_input("Please select an option: ")
+            if user_choice == 0:
+                break
+            elif user_choice == 1:
+            # Book found, proceed with deletion, commit changes and print deletion confirmation to the user
+                cursor.execute('DELETE FROM books WHERE book_id = ?', (book_id,))
+                connect.commit() 
+                print(f"{result[0]} removed from the library")
+                break
+            else:
+                print('Invalid option. Please enter 0 or 1.')
+        else:
+            print(f"No book found with ID: {book_id}")
 # Function to update quantity of a book - staff function
 def update_book_quantity():
      # Create a connection with the SQLite3 database and create a cursor object
