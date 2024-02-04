@@ -133,7 +133,7 @@ def remove_book():
     if result:
         while True:
             print(f"Please confirm removal of: {result[0]}\n 0: No, 1: Yes")
-        # Error handling for book not found in table
+            # User input for removal confirmation
             user_choice = get_integer_input("Please select an option: ")
             if user_choice == 0:
                 break
@@ -144,9 +144,12 @@ def remove_book():
                 print(f"{result[0]} removed from the library")
                 break
             else:
+                 # Error handling for invalid option
                 print('Invalid option. Please enter 0 or 1.')
         else:
+            # Error handling for book not found in table
             print(f"No book found with ID: {book_id}")
+
 # Function to update quantity of a book - staff function
 def update_book_quantity():
      # Create a connection with the SQLite3 database and create a cursor object
@@ -162,11 +165,12 @@ def update_book_quantity():
     # Fetch Result from SELECT query to check if book id exists in table
     result = cursor.fetchone()
     if result:
-        # User input for new book quantity
+        # Display current quantity and input for new book quantity
+        print(f"The current quantity of {result[0]} is: {result[1]}")
         new_quantity = get_integer_input("Please Enter New Quantity: ")
         # Update the quantity of the specified book
         cursor.execute("UPDATE books SET quantity = ? WHERE book_id = ?", (new_quantity, book_id))
-        print(f"Quantity for {result[0]} updated to: {new_quantity}.")
+        print(f"Quantity for {result[0]} updated from {result[1]} to {new_quantity}.")
     else:
         # Error handling for book not found in table
         print(f"No book found with ID: {book_id}")
@@ -184,18 +188,36 @@ def update_book_information():
     result = cursor.fetchone()
     # If book exists, prompt user input for new book information
     if result:
+        # Display current information for selected book
+        print(f"Make changes to ID:{book_id} {result[1]} by {result[2]}: ")
+        print(f"Current Information:\n ID: {book_id}, Title: {result[1]}, Author: {result[2]}\nISBN: {result[3]}, Pub Date:{result[4]}, Genre: {result[5]}\n ")
+        # User input for new book information
         new_title = get_valid_input("Please Enter New Title: ")
         new_author = get_valid_input("Please Enter New Author: ")
         new_isbn = get_valid_input("Please Enter New ISBN: ")
         new_pub_date = get_valid_input("Please Enter New Publication Date(YYYY-MM-DD): ")
         new_genre = get_valid_input("Please Enter New Genre: ")
-        # Execute an SQL UPDATE statement to modify the quantity of the specified item
+        # Execute an UPDATE statement to modify the quantity of the specified item
         cursor.execute('''
             UPDATE books
             SET title = ?, author = ?, isbn = ?, pub_date = ?, genre = ?
             WHERE book_id = ?
             ''', (new_title, new_author, new_isbn, new_pub_date, new_genre, book_id))
-        print(f"Information for {result[1]} updated.")
+        # Execute a SELECT query to fetch updated book information
+        cursor.execute('''
+                SELECT *
+                FROM books
+                WHERE book_id = ?
+            ''', (book_id,))
+        updated_details = cursor.fetchone()
+        print(f"Updated information for: {updated_details[1]}:")
+        # Print the updated details in a formatted table
+        print("{:<5} {:<25} {:20} {:<15} {:<12} {:<30}".format("ID", "Name", "Author", "ISBN", "Date", "Description"))
+        print("From:")
+        print("{:<5} {:<25} {:<20} {:<15} {:<12} {:<30}".format(*result))
+        print("To:")
+        # Print updated details
+        print("{:<5} {:<25} {:<20} {:<15} {:<12} {:<30}".format(*updated_details))
     else:
         # Error handling for book not found in table
         print(f"No book found with ID: {book_id}")
