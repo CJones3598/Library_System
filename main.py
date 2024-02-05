@@ -1,6 +1,13 @@
 # Import SQLite3 module and Error class for database functionality
 import sqlite3
 from sqlite3 import Error
+# Import hashlib module for password hashing
+import hashlib
+# Import random module for username creation
+import random
+
+# Global variables for username of user logged in
+current_user = None
 
 # Functions for input validations
 def get_valid_input(prompt):
@@ -23,14 +30,26 @@ def get_integer_input(prompt):
         # If value not integer, return an error and prompt input
         except ValueError:
             print("Invalid input. Please enter a valid option")
+def get_access_input(prompt):
+    while True:
+        try:
+            # Check if user input is an integer
+            user_input = int(input(prompt))
 
-# Function to connect to SQLite3 database
+            # Check if the input is either 1 or 5
+            if user_input in [1, 5]:
+                return user_input
+            else:
+                print("Invalid input. Please enter either 1 or 5.")
+        except ValueError:
+            print("Invalid input. Please enter a valid input.")
+
+# Functions to connect to SQLite3 database and create tables in database
 def database_connection():
     # Creates connection with SQLite3 database and creates cursor object
     connect = sqlite3.connect('library.db')
     cursor = connect.cursor()
     return connect, cursor
-# Function to create tables in SQLite3 database
 def create_tables():
     try:
         # Connect to library DB and create a cursor
@@ -47,6 +66,26 @@ def create_tables():
             quantity INTEGER
         )
     ''')
+        # Create a table to store staff information 
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS staff_information (
+            staff_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            first_name TEXT,
+            last_name TEXT,
+            job_role TEXT
+        )
+    ''')
+        # Create a table to store staff user accounts
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS staff_accounts (
+            username TEXT PRIMARY KEY,
+            password TEXT,
+            access_level INTEGER,
+            staff_id INTEGER,
+            FOREIGN KEY (staff_id) REFERENCES staff_information (staff_id)
+        )
+    ''')
+        
     # Handles SQLite3 errors, displays error to user
     except Error as e:
         print("Error occurred -", e)
@@ -56,22 +95,376 @@ def create_tables():
             connect.commit()
             connect.close()
             print("Connection with database established.")
+def main_menu():
+    print('''Library Management System\n
+                    Welcome to the library management system.\n
+                    1. Staff Portal
+                    0. Exit
+                ''')
 
-# Function to display staff main menu
+# Functions for username generation and password hashing  
+def generate_username(first_name, last_name, account_type):
+    connection, cursor = database_connection()
+    while True:
+        # Generate a username using uppercase first name, last name, and 2 random numbers
+        username = f"{first_name.upper()}.{last_name.upper()}{random.randint(0, 9)}{random.randint(0, 9)}"
+        # Check if the username already exists in staff_accounts table
+        cursor.execute(f'''
+            SELECT COUNT(*) FROM {account_type} WHERE username = ?
+        ''', (username,))
+        count = cursor.fetchone()[0]
+        # If the count is 0, the username is unique
+        if count == 0:
+            return username
+def hash_password(password):
+    # Use hashlib to hash user input password
+    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    return hashed_password
+
+# Function for login system
+def login(account_type):
+    # Fetch global variable for the username of current logged in user
+    global current_user
+    # Creates connection with SQLite3 database and creates cursor object
+    connect, cursor = database_connection()
+    # Create a variable for login attempts
+    attempts = 0
+    # Login block for more than 5 invalid logins
+    while attempts < 5:
+        # Take user input for username and password
+        username = get_valid_input("Enter username: ")
+        password = get_valid_input("Enter password: ")
+        # Hash the password for comparison
+        hashed_password = hash_password(password)
+        # Check if the username and hashed password match in staff_accounts table
+        cursor.execute(f'SELECT * FROM {account_type} WHERE username=? AND password=?', (username, hashed_password))
+        # Fetch the result from the SELECT query
+        account = cursor.fetchone()
+        # If the account is valid proceed with login
+        if account:
+            print("Login successful.")
+            # You can add further logic for staff login success
+            if account_type == "staff_accounts":
+                current_user = username
+                staff_main_menu()
+                break  # Exit the loop after staff_main_menu() execution
+            # Error Handling if the account is not valid
+            else:
+                print("Invalid Account")
+        else:
+            # Login Block calculations for attempts
+            attempts += 1
+            remaining_attempts = 5 - attempts
+            print(f"Invalid username or password. Remaining attempts: {remaining_attempts}")
+    # Maximum Login attempt handling
+    print("Exceeded maximum login attempts. Closing the program.")
+    exit()
+
+# Functions for user account management
+def create_admin():
+    # Create a connection with the SQLite3 database and create a cursor object
+    connect, cursor = database_connection()
+    # Set variable for admin account
+    username = 'ADMIN'
+    password = 'ADMIN'
+    hashed_password = hash_password(password)
+    # Check if admin user exists
+    cursor.execute('SELECT * FROM staff_accounts WHERE username=?', (username,))
+    admin_exists = cursor.fetchone()
+    # If admin account doesnt exist, create one
+    if not admin_exists:
+        cursor.execute('INSERT INTO staff_accounts VALUES (?, ?, ?, ?)', (username, hashed_password, "5", "0"))
+        print("Administrator account created with username 'ADMIN' and password 'ADMIN'\nPlease change the password after login.")
+        # Commit the changes and close the connection to SQLite database
+        connect.commit()
+        connect.close()
+def staff_register():
+    # Create a connection with the SQLite3 database and create a cursor object
+    connect, cursor = database_connection()
+    # User inputs for staff information
+    first_name = get_valid_input("Enter first name: ")
+    last_name = get_valid_input("Enter last name: ")
+    job_role = get_valid_input("Enter job role: ")
+    # Execute INSERT query to input information into staff information table
+    cursor.execute('''
+        INSERT INTO staff_information (first_name, last_name, job_role)
+        VALUES (?, ?, ?)
+    ''', (first_name, last_name, job_role))
+    # User inputs for staff account
+    username = generate_username(first_name, last_name, "staff_accounts")
+    password = get_valid_input("Enter password: ")
+    print('Access Levels: 1-General, 5-Administrator')
+    access_level = get_integer_input("Enter access level: ")
+    # Hash the password before storing it in staff accounts table
+    hashed_password = hash_password(password)
+    # Get the staff_id of the last inserted staff_information record
+    staff_id = cursor.lastrowid
+    # Insert staff account information into staff_accounts table
+    cursor.execute('''
+        INSERT INTO staff_accounts (username, password, access_level, staff_id)
+        VALUES (?, ?, ?, ?)
+    ''', (username, hashed_password, access_level, staff_id))
+    # Commit changes and close the database
+    connect.commit()
+    connect.close()
+def remove_staff():
+    # Create a connection with the SQLite3 database and create a cursor object
+    connect, cursor = database_connection()
+    # User input for the staff ID to be removed
+    staff_id = input("Enter the staff ID to remove: ")
+    # Check if the staff ID exists in staff_information
+    cursor.execute('''
+        SELECT * FROM staff_information WHERE staff_id = ?
+    ''', (staff_id,))
+    # Fetch result from SELECT query
+    staff_info = cursor.fetchone()
+    # If the staff account exists, proceed with confirmation
+    if staff_info:
+        # Display staff's first name and last name
+        print(f"Removing staff: {staff_info[1]} {staff_info[2]}")
+        # Prompt user for confirmation
+        confirm = input("Enter 0 to cancel removal, or 1 to confirm removal: ")
+        if confirm == "1":
+            # Remove the corresponding row from staff_accounts
+            cursor.execute('''
+                DELETE FROM staff_accounts WHERE staff_id = ?
+            ''', (staff_id,))
+            # Remove the corresponding row from staff_information
+            cursor.execute('''
+                DELETE FROM staff_information WHERE staff_id = ?
+            ''', (staff_id,))
+            # Commit changes to the database
+            connect.commit()
+            connect.close()
+            print(f"Staff with ID {staff_id} successfully removed.")
+        else:
+            print("Removal canceled.")
+    else:
+        print(f"Staff with ID {staff_id} not found.")
+def view_staff_accounts():
+    # Create a connection with the SQLite3 database and create a cursor object
+    connect, cursor = database_connection()
+    # Perform a JOIN operation to retrieve information from both tables
+    cursor.execute('''
+        SELECT sa.username, sa.access_level, si.first_name, si.last_name, si.job_role
+        FROM staff_accounts sa
+        JOIN staff_information si ON sa.staff_id = si.staff_id
+    ''')
+    # Fetch all the rows
+    accounts = cursor.fetchall()
+    # Display the retrieved information
+    if accounts:
+        print("| {:<25} | {:<12} | {:<20} | {:<20} | {:<10} |".format(
+            "Username", "Access Level", "First Name", "Last Name", "Job Role"))
+        print("|" + "-" * 101 + "|")
+        for account in accounts:
+            print("| {:<25} | {:<12} | {:<20} | {:<20} | {:<10} |".format(
+                account[0], account[1], account[2], account[3], account[4]))
+        print("|" + "-" * 101 + "|")
+    else:
+        # Error handling if no accounts in table
+        print("No accounts found.")
+    connect.close()
+def change_password(account_type):
+    # Fetch global variable for current user logged in
+    global current_user
+    connect, cursor = database_connection()
+    # Get the current password from the user
+    current_password = get_valid_input("Please enter your current password: ")
+    hashed_current_password = hashlib.sha256(current_password.encode()).hexdigest()
+    # Check if the entered current password is correct
+    cursor.execute(f'SELECT * FROM {account_type} WHERE username=? AND password=?', (current_user, hashed_current_password))
+    user = cursor.fetchone()
+    # If the details do not match, exit password change
+    if user is None:
+        print("Incorrect password. Password change failed.")
+    else:
+        # If the current password is correct, prompt for a new password
+        new_password = get_valid_input("Please enter your new password: ")
+        new_hashed_password = hash_password(new_password)
+        # Prompt for the new password again for confirmation
+        confirm_password = get_valid_input("Please confirm your new password: ")
+        confirm_hashed_password = hash_password(confirm_password)
+        # Check if the new passwords match
+        if new_hashed_password != confirm_hashed_password:
+            print("Passwords do not match. Password change failed.")
+        else:
+            # Update the password in the database
+            cursor.execute(f'''
+                UPDATE {account_type}
+                SET password = ?
+                WHERE username = ?
+            ''', (new_hashed_password, current_user))
+            print("Password successfully changed.")
+    # Commit changes to the database and close the connection
+    connect.commit()
+    connect.close()
+def reset_user_password():
+    # Create a connection with the SQLite3 database and create a cursor object
+    connect, cursor = database_connection()
+    # Prompt options for type of user requiring password reset
+    print("Resest Password for: 1-Staff")
+    user_choice = get_integer_input("Please select an option: ")
+    # Set account type variable for SELECT and UPDATE query
+    if user_choice == 1:
+        account_type = "staff_accounts"
+    else:
+        print("Please select a valid option")
+    username = get_valid_input("Please enter username of Account: ")
+    # Fetch the current username and password
+    cursor.execute(f'''
+        SELECT username, password
+        FROM {account_type}
+        WHERE username = ?
+    ''', (username,))
+    # Fetch result from SELECT query
+    result = cursor.fetchone()
+    # If there is an account, proceed with password reset
+    if result:
+        username, password = result
+        print(f"Resetting password for user: {username}")
+        # User input for new user password
+        new_password = get_valid_input("Enter the new password: ")
+        new_hashed_password = hash_password(new_password)
+        # Execute an SQL UPDATE statement to modify the password of the specified user
+        cursor.execute(f'''
+            UPDATE {account_type}
+            SET password = ?
+            WHERE username = ?
+        ''', (new_hashed_password, username))
+        # Commit changed and close database        
+        connect.commit()
+        connect.close()
+        # Display changes and Error handling for invalid account
+        print(f"User: {username} password changed to {new_password}")
+    else:
+        print(f"User: {username} not found.")
+def change_access_level():
+    # Create a connection with the SQLite3 database and create a cursor object
+    connect, cursor = database_connection()
+    username = get_valid_input("Please Enter Username: ")
+    # Fetch the current username and access level
+    cursor.execute('''
+        SELECT username, access_level
+        FROM staff_accounts
+        WHERE username = ?
+    ''', (username,))
+    # Fetch result from SELECT query
+    result = cursor.fetchone()
+    # If an account exists, proceed with changing access level
+    if result:
+        username, current_access = result
+        print('Access Levels: 1-General, 5-Administrator')
+        print(f"Access Level of {username} is: {current_access}")
+        # User input for new user access level
+        new_access = get_access_input("Enter the new access level: ")
+        # Execute an SQL UPDATE statement to modify the access level of the specified user
+        cursor.execute('''
+            UPDATE staff_accounts
+            SET access_level = ?
+            WHERE username = ?
+        ''', (new_access, username))
+        # Commit changes to the database and close the database connection
+        connect.commit()
+        connect.close()
+        # Display changes to user
+        print(f"User: {username} access level adjusted from {current_access} to {new_access}")
+    else:
+        print(f"User: {username} not found.")
+
+# Functions for main menus and sub menus
 def staff_main_menu():
-   # Print Application Name and staff options to users for input
-   print('''Library Management System\n
-            Welcome to the library management system.\n
+    # Print Application Name and staff options to users for input
+    print('''Library Management System\n
+            Welcome to the Staff Portal.\n
             1. View All Books
             2. Add New Book
             3. Delete Book
             4. Update Book Quantity
             5. Update Book Information
             6. Check Book Stock Status
+            7. Admin Functions
             0. Exit
-         ''')
-   
-# Function to view all books in library - staff function 
+          
+            \n\nCurrent user: ''',current_user
+         )
+    while True:
+        # Displays staff main menu and prompts user choice input
+        choice = get_integer_input("Enter your choice 0-6: ")
+
+        if choice == 0:
+            # Exit Program
+            print("Exiting Program. Goodbye!")
+            break
+        elif choice == 1:
+            # View all books in the library
+            view_all_books()
+        elif choice == 2:
+            # Add a new book to the library
+            add_book()
+        elif choice == 3:
+            # Remove a book from the library
+            remove_book()
+        elif choice == 4:
+            # Update the quantity of a book in the library
+            update_book_quantity()
+        elif choice == 5:
+            # Update the information of a book in the library
+            update_book_information()
+        elif choice == 6:
+            # Check the stock status of a book in the library
+            check_book_status()
+        elif choice == 7:
+            admin_menu()
+        else:
+            print("Please select a valid option.")
+def admin_menu():
+    # Fetch global variable for username of current user
+    global current_user
+    # Create a connection with the SQLite3 database and create a cursor object
+    connect, cursor = database_connection()
+    # SELECT query to check access level of logged in account
+    cursor.execute('''
+        SELECT access_level
+        FROM staff_accounts
+        WHERE username = ?
+    ''', (current_user,))
+    # Fetch the result of the SELECT query
+    result = cursor.fetchone()
+    # Check if there is a current user and their access level is 5
+    if  result and result[0] == 5:
+        # Print options to the user
+        while True:
+            print('''\nAdministration Options:
+            0: Main Menu, 1: Add Staff Account, 2: Remove Staff Account, 3: Change User Access Level
+            4: Change Password, 5: Reset User Password, 6: View Staff Accounts''')
+            user_option = get_integer_input("Please select an option: ")
+            # Admin function options
+            if user_option == 0:
+                break
+            elif user_option == 1:
+                print('Creating a New Staff Account')
+                staff_register()
+            elif user_option == 2:
+                print('Removing a User:')
+                remove_staff()
+            elif user_option == 3:
+                print('Changing user access level:')
+                change_access_level()
+            elif user_option == 4:
+                change_password("staff_accounts")
+            elif user_option == 5:
+                reset_user_password()
+            elif user_option == 6:
+                view_staff_accounts()
+            else:
+                # Error handling for incorrect option
+                print('Please enter a valid option')
+    else:
+        # Error handling for account without permissions
+        print("You do not have permission to access to access these functions")
+
+# Library Functions for books - Staff Functions
 def view_all_books():
     # Creates connection with SQLite3 database and creates cursor object
     connect, cursor = database_connection()
@@ -96,8 +489,6 @@ def view_all_books():
     else:
         # Error handling if no data in books table
         print("No books found in the library.")
-
-# Function to add book to library - staff function
 def add_book():
     # Creates connection with SQLite3 database and creates cursor object
     connect, cursor = database_connection()
@@ -121,8 +512,6 @@ def add_book():
     # Commit table and database changes and close connection
     connect.commit()
     connect.close()
-
-# Function to remove book from library - staff function
 def remove_book():
     # Creates connection with SQLite3 database and creates cursor object
     connect, cursor = database_connection()
@@ -149,8 +538,6 @@ def remove_book():
         else:
             # Error handling for book not found in table
             print(f"No book found with ID: {book_id}")
-
-# Function to update quantity of a book - staff function
 def update_book_quantity():
      # Create a connection with the SQLite3 database and create a cursor object
     connect, cursor = database_connection()
@@ -177,8 +564,6 @@ def update_book_quantity():
     # Commit changes and close the database connection
     connect.commit()
     connect.close()
-
-# Function to update book information - staff function
 def update_book_information():
      # Create a connection with the SQLite3 database and create a cursor object
     connect, cursor = database_connection()
@@ -224,8 +609,6 @@ def update_book_information():
     # Commit changes to database and close database connection
     connect.commit()
     connect.close()
-
-# Function to check book stock status - staff function
 def check_book_status():
     # Create a connection with the SQLite3 database and create a cursor object
     connect, cursor = database_connection()
@@ -254,30 +637,31 @@ def check_book_status():
 if __name__ == "__main__":
     # Create tables in database if they do not exist
     create_tables()
+    # Create an admin account for first time use
+    create_admin()
     while True:
-        # Displays staff main menu and prompts user choice input
-        staff_main_menu()
-        choice = input("Enter your choice 0-5: ")
-
-        if choice == "0":
-            # Exit Program
-            print("Exiting Program. Goodbye!")
+        main_menu()
+        user_choice = get_integer_input("Please select an option: ")
+        if user_choice == 0:
             break
-        elif choice == "1":
-            # View all books in library
-            view_all_books()
-        elif choice == "2":
-            # Add a new book to the library
-            add_book()
-        elif choice == "3":
-            # Remove a book from the library
-            remove_book()
-        elif choice == "4":
-            # Update the quantity of a book in the library
-            update_book_quantity()
-        elif choice == "5":
-            # Update the information of a book in the library
-            update_book_information()
-        elif choice == "6":
-            # Check the stock status of a book in the library
-            check_book_status()
+        # Staff Login Portal with options
+        elif user_choice == 1:
+            while True:
+                print('''Library Management System\n
+                    Welcome to the Staff Portal.\n
+                    1. Login
+                    0. Return to Main Menu
+                 ''')
+                staff_choice = get_integer_input("Please select an option: ")
+                # Return to main menu
+                if staff_choice == 0:
+                    break
+                # Login page for staff accounts
+                elif staff_choice == 1:
+                    login("staff_accounts")
+                else:
+                    # Error handling for invald option selected
+                    print("Please select a valid option")
+
+        else:
+            print("Please select a valid option")
