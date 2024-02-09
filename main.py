@@ -192,9 +192,10 @@ def staff_register():
     ''', (first_name, last_name, job_role))
     # User inputs for staff account
     username = generate_username(first_name, last_name, "staff_accounts")
+    print("Username:", username)
     password = get_valid_input("Enter password: ")
     print('Access Levels: 1-General, 5-Administrator')
-    access_level = get_integer_input("Enter access level: ")
+    access_level = get_access_input("Enter access level: ")
     # Hash the password before storing it in staff accounts table
     hashed_password = hash_password(password)
     # Get the staff_id of the last inserted staff_information record
@@ -211,7 +212,7 @@ def remove_staff():
     # Create a connection with the SQLite3 database and create a cursor object
     connect, cursor = database_connection()
     # User input for the staff ID to be removed
-    staff_id = input("Enter the staff ID to remove: ")
+    staff_id = get_integer_input("Enter the staff ID to remove: ")
     # Check if the staff ID exists in staff_information
     cursor.execute('''
         SELECT * FROM staff_information WHERE staff_id = ?
@@ -246,7 +247,7 @@ def view_staff_accounts():
     connect, cursor = database_connection()
     # Perform a JOIN operation to retrieve information from both tables
     cursor.execute('''
-        SELECT sa.username, sa.access_level, si.first_name, si.last_name, si.job_role
+        SELECT si.staff_id, sa.username, sa.access_level, si.first_name, si.last_name, si.job_role
         FROM staff_accounts sa
         JOIN staff_information si ON sa.staff_id = si.staff_id
     ''')
@@ -254,13 +255,13 @@ def view_staff_accounts():
     accounts = cursor.fetchall()
     # Display the retrieved information
     if accounts:
-        print("| {:<25} | {:<12} | {:<20} | {:<20} | {:<10} |".format(
-            "Username", "Access Level", "First Name", "Last Name", "Job Role"))
-        print("|" + "-" * 101 + "|")
+        print("| {:<10} | {:<25} | {:<12} | {:<20} | {:<20} | {:<20} |".format(
+            "Staff ID", "Username", "Access Level", "First Name", "Last Name", "Job Role"))
+        print("|" + "-" * 124 + "|")
         for account in accounts:
-            print("| {:<25} | {:<12} | {:<20} | {:<20} | {:<10} |".format(
-                account[0], account[1], account[2], account[3], account[4]))
-        print("|" + "-" * 101 + "|")
+            print("| {:<10} | {:<25} | {:<12} | {:<20} | {:<20} | {:<20} |".format(
+                account[0], account[1], account[2], account[3], account[4], account[5]))
+        print("|" + "-" * 124 + "|")
     else:
         # Error handling if no accounts in table
         print("No accounts found.")
