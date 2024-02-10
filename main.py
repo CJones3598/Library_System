@@ -177,25 +177,17 @@ def login(account_type):
         # If the account is valid proceed with login
         if account:
             print("Login successful.")
-            # You can add further logic for staff login success
-            if account_type == "staff_accounts":
-                current_user = username
-                staff_main_menu()
-                break  # Exit the loop after staff_main_menu() execution
-            elif account_type  == "customer_accounts":
-                current_user = username
-                customer_main_menu()
+            current_user = username
             # Error Handling if the account is not valid
-            else:
-                print("Invalid Account")
+            break
         else:
             # Login Block calculations for attempts
             attempts += 1
             remaining_attempts = 5 - attempts
             print(f"Invalid username or password. Remaining attempts: {remaining_attempts}")
     # Maximum Login attempt handling
-    print("Exceeded maximum login attempts. Closing the program.")
-    exit()
+        print("Exceeded maximum login attempts. Closing the program.")
+        exit()
 
 # Functions for user account management
 def create_admin():
@@ -846,7 +838,6 @@ def view_available_books():
         else:
             # Error handling if no data in books table
             print("No books available")
-
 def view_loans():
     global current_user
     connect, cursor = database_connection()
@@ -972,6 +963,8 @@ if __name__ == "__main__":
                 # Login page for staff accounts
                 elif staff_choice == 1:
                     login("staff_accounts")
+                    staff_main_menu()
+                    break
                 else:
                     # Error handling for invald option selected
                     print("Please select a valid option")
@@ -989,6 +982,8 @@ if __name__ == "__main__":
                     break
                 elif customer_choice == 1:
                     login("customer_accounts")
+                    customer_main_menu()
+                    break
                 elif customer_choice == 2:
                     customer_register()
                 else:
