@@ -434,6 +434,7 @@ def customer_register():
         INSERT INTO customer_accounts (username, password, customer_id)
         VALUES (?, ?, ?)
     ''', (username, hashed_password, customer_id))
+    print("Register Account Successful. Welcome", first_name)
     # Commit changes to the database
     connect.commit()
     connect.close()
@@ -455,6 +456,10 @@ def remove_customer():
         # Prompt user for confirmation
         confirm = input("Enter 0 to cancel removal, or 1 to confirm removal: ")
         if confirm == "1":
+            # Remove the corresponding transactions from the transactions table
+            cursor.execute('''
+                DELETE FROM transactions WHERE customer_id = ?
+            ''', (customer_id,))
             # Remove the corresponding row from customer_accounts
             cursor.execute('''
                 DELETE FROM customer_accounts WHERE customer_id = ?
@@ -466,11 +471,12 @@ def remove_customer():
             # Commit changes to the database
             connect.commit()
             connect.close()
-            print(f"Customer with ID {customer_id} successfully removed.")
+            print(f"Customer with ID {customer_id} and associated transactions successfully removed.")
         else:
             print("Removal canceled.")
     else:
         print(f"Customer with ID {customer_id} not found.")
+
 def view_customer_accounts():
     connect, cursor = database_connection()
     # Perform a JOIN operation to retrieve information from both tables
@@ -803,42 +809,44 @@ def check_book_status():
 
 # Library Functions for books - Customer Functions
 def view_available_books():
-    # Creates connection with SQLite3 database and creates cursor object
-    connect, cursor = database_connection()
-    # Execute a SELECT query to retrieve columns and data from the books table
-    cursor.execute('''
-        SELECT book_id, title, author, isbn, pub_date, genre, quantity
-        FROM books
-        WHERE quantity >= 1
-    ''')
-    # Fetch all results obtained from SELECT query
-    books = cursor.fetchall()
-    # Close SQLite3 database connection
-    connect.close()
-    # Check if there are any books in the books table
-    if books:
-        # If there are books, print a header for the book information to the user
-        print("Books in the Library with Quantity of 1 or More:")
-        # Print a formatted header with column names to the user
-        print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format("ID", "Title", "Author", "ISBN", "Date", "Genre", "QTY"))
-        print("|" + "-" * 154 + "|")
-        for book in books:
-        # Print formatted information for each book in books table
-            print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format(*book))
-        print("|" + "-" * 154 + "|")
+    while True:
+        # Creates connection with SQLite3 database and creates cursor object
+        connect, cursor = database_connection()
+        # Execute a SELECT query to retrieve columns and data from the books table
+        cursor.execute('''
+            SELECT book_id, title, author, isbn, pub_date, genre, quantity
+            FROM books
+            WHERE quantity >= 1
+        ''')
+        # Fetch all results obtained from SELECT query
+        books = cursor.fetchall()
+        # Close SQLite3 database connection
+        connect.close()
+        # Check if there are any books in the books table
+        if books:
+            # If there are books, print a header for the book information to the user
+            print("Books in the Library with Quantity of 1 or More:")
+            # Print a formatted header with column names to the user
+            print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format("ID", "Title", "Author", "ISBN", "Date", "Genre", "QTY"))
+            print("|" + "-" * 154 + "|")
+            for book in books:
+                # Print formatted information for each book in books table
+                print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format(*book))
+            print("|" + "-" * 154 + "|")
 
-        while True:
             print("Options: 0-Main Menu, 1-Borrow Book")
             user_choice = get_integer_input("Please select an option: ")
             if user_choice == 0:
                 break
             elif user_choice == 1:
                 borrow_book()
+
             else:
                 print("Please select a valid option")
-    else:
-    # Error handling if no data in books table
-        print("No books available")
+        else:
+            # Error handling if no data in books table
+            print("No books available")
+
 def view_loans():
     global current_user
     connect, cursor = database_connection()
