@@ -5,6 +5,8 @@ from sqlite3 import Error
 import hashlib
 # Import random module for username creation
 import random
+# Import datetime and timedelta class from datetime module for transactions
+from datetime import datetime, timedelta
 
 # Global variables for username of user logged in
 current_user = None
@@ -49,6 +51,7 @@ def database_connection():
     # Creates connection with SQLite3 database and creates cursor object
     connect = sqlite3.connect('library.db')
     cursor = connect.cursor()
+    connect.execute("PRAGMA foreign_keys = 1")
     return connect, cursor
 def create_tables():
     try:
@@ -85,7 +88,37 @@ def create_tables():
             FOREIGN KEY (staff_id) REFERENCES staff_information (staff_id)
         )
     ''')
-        
+                 # Create a table to store customer information
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS customer_information (
+            customer_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            first_name TEXT,
+            last_name TEXT,
+            email TEXT
+        )
+    ''')
+        # Create a table to store customer accounts
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS customer_accounts (
+            username TEXT PRIMARY KEY,
+            password TEXT,
+            customer_id INTEGER,
+            FOREIGN KEY (customer_id) REFERENCES customer_information (customer_id)
+        )
+    ''')
+       # Create a table to store book information 
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS transactions (
+            transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER,
+            book_id INTEGER,
+            borrow_date TEXT,
+            return_date TEXT,
+            date_returned TEXT,
+            FOREIGN KEY (customer_id) REFERENCES customer_information (customer_id),
+            FOREIGN KEY (book_id) REFERENCES books (book_id)
+        )
+    ''')
     # Handles SQLite3 errors, displays error to user
     except Error as e:
         print("Error occurred -", e)
@@ -99,6 +132,7 @@ def main_menu():
     print('''Library Management System\n
                     Welcome to the library management system.\n
                     1. Staff Portal
+                    2. Customer Portal
                     0. Exit
                 ''')
 
@@ -148,6 +182,9 @@ def login(account_type):
                 current_user = username
                 staff_main_menu()
                 break  # Exit the loop after staff_main_menu() execution
+            elif account_type  == "customer_accounts":
+                current_user = username
+                customer_main_menu()
             # Error Handling if the account is not valid
             else:
                 print("Invalid Account")
@@ -372,6 +409,95 @@ def change_access_level():
         print(f"User: {username} access level adjusted from {current_access} to {new_access}")
     else:
         print(f"User: {username} not found.")
+def customer_register():
+    # Create a connection with the SQLite3 database and create a cursor object
+    connect, cursor = database_connection()
+    # User inputs for customer information
+    first_name = get_valid_input("Enter first name: ")
+    last_name = get_valid_input("Enter last name: ")
+    email = get_valid_input("Enter email address: ")
+    # Execute INSERT query to input information into customer information table
+    cursor.execute('''
+        INSERT INTO customer_information (first_name, last_name, email)
+        VALUES (?, ?, ?)
+    ''', (first_name, last_name, email))
+    # User inputs for customer account
+    username = generate_username(first_name, last_name, "customer_accounts")
+    print("Username:", username)
+    password = get_valid_input("Enter password: ")
+    # Hash the password before storing it in staff accounts table
+    hashed_password = hash_password(password)
+    # Get the cstomer_id of the last inserted customer_information record
+    customer_id = cursor.lastrowid
+    # Insert customer account information into customer_accounts table
+    cursor.execute('''
+        INSERT INTO customer_accounts (username, password, customer_id)
+        VALUES (?, ?, ?)
+    ''', (username, hashed_password, customer_id))
+    # Commit changes to the database
+    connect.commit()
+    connect.close()
+def remove_customer():
+    # Create a connection with the SQLite3 database and create a cursor object
+    connect, cursor = database_connection()
+    # User input for the customer ID to be removed
+    customer_id = get_integer_input("Enter the Customer ID to remove: ")
+    # Check if the customer ID exists in customer_information
+    cursor.execute('''
+        SELECT * FROM customer_information WHERE customer_id = ?
+    ''', (customer_id,))
+    # Fetch result from SELECT query
+    customer_info = cursor.fetchone()
+    # If the customer account exists, proceed with confirmation
+    if customer_info:
+        # Display customers's first name and last name
+        print(f"Removing Customer: {customer_info[1]} {customer_info[2]}")
+        # Prompt user for confirmation
+        confirm = input("Enter 0 to cancel removal, or 1 to confirm removal: ")
+        if confirm == "1":
+            # Remove the corresponding row from customer_accounts
+            cursor.execute('''
+                DELETE FROM customer_accounts WHERE customer_id = ?
+            ''', (customer_id,))
+            # Remove the corresponding row from customer_information
+            cursor.execute('''
+                DELETE FROM customer_information WHERE customer_id = ?
+            ''', (customer_id,))
+            # Commit changes to the database
+            connect.commit()
+            connect.close()
+            print(f"Customer with ID {customer_id} successfully removed.")
+        else:
+            print("Removal canceled.")
+    else:
+        print(f"Customer with ID {customer_id} not found.")
+def view_customer_accounts():
+    connect, cursor = database_connection()
+    # Perform a JOIN operation to retrieve information from both tables
+    cursor.execute('''
+        SELECT ca.customer_id, ca.username, ci.first_name, ci.last_name, ci.email
+        FROM customer_accounts ca
+        JOIN customer_information ci ON ca.customer_id = ci.customer_id
+    ''')
+
+    # Fetch all the rows
+    accounts = cursor.fetchall()
+
+    # Display the retrieved information
+    if accounts:
+        print("| {:<12} | {:<25} | {:<20} | {:<20} | {:<30} |".format(
+            "Customer ID", "Username", "First Name", "Last Name", "Email"))
+        print("|" + "-" * 121 + "|")
+
+        for account in accounts:
+            print("| {:<12} | {:<25} | {:<20} | {:<20} | {:<30} |".format(
+                account[0], account[1], account[2], account[3], account[4]))
+        print("|" + "-" * 121 + "|")
+    else:
+        print("No accounts found.")
+    
+    # Don't forget to close the connection
+    connect.close()
 
 # Functions for main menus and sub menus
 def staff_main_menu():
@@ -437,8 +563,16 @@ def admin_menu():
         # Print options to the user
         while True:
             print('''\nAdministration Options:
-            0: Main Menu, 1: Add Staff Account, 2: Remove Staff Account, 3: Change User Access Level
-            4: Change Password, 5: Reset User Password, 6: View Staff Accounts''')
+            0: Main Menu
+            1: Add Staff Account
+            2: Remove Staff Account
+            3: Change User Access Level
+            4: Change Password
+            5: Reset User Password 
+            6: View Staff Accounts
+            7: View Customer Accounts
+            8: Remove Customer Account      
+                  ''')
             user_option = get_integer_input("Please select an option: ")
             # Admin function options
             if user_option == 0:
@@ -458,12 +592,44 @@ def admin_menu():
                 reset_user_password()
             elif user_option == 6:
                 view_staff_accounts()
+            elif user_option == 7:
+                view_customer_accounts()
+            elif user_option == 8:
+                remove_customer()
             else:
                 # Error handling for incorrect option
                 print('Please enter a valid option')
     else:
         # Error handling for account without permissions
         print("You do not have permission to access to access these functions")
+def customer_main_menu():
+    
+    while True:
+        # Print Application Name and staff options to users for input
+        print('''Library Management System\n
+                Welcome to the Customer Portal.\n
+                1. View Available Books
+                2. View Loans
+                3. Change Password
+                0. Logout
+
+                \n\nCurrent user: ''',current_user
+            )
+        # Displays staff main menu and prompts user choice input
+        choice = get_integer_input("Enter your choice 0-6: ")
+
+        if choice == 0:
+            # Exit Program
+            print("Exiting Program. Goodbye!")
+            break
+        elif choice == 1:
+            view_available_books()
+        elif choice == 2:
+            view_loans()
+        elif choice == 3:
+            change_password("customer_accounts")
+        else:
+            print("Please select a valid option.")
 
 # Library Functions for books - Staff Functions
 def view_all_books():
@@ -635,6 +801,144 @@ def check_book_status():
         # Error handling for book not found in table
         print(f"Book not found with ID: {book_id}")
 
+# Library Functions for books - Customer Functions
+def view_available_books():
+    # Creates connection with SQLite3 database and creates cursor object
+    connect, cursor = database_connection()
+    # Execute a SELECT query to retrieve columns and data from the books table
+    cursor.execute('''
+        SELECT book_id, title, author, isbn, pub_date, genre, quantity
+        FROM books
+        WHERE quantity >= 1
+    ''')
+    # Fetch all results obtained from SELECT query
+    books = cursor.fetchall()
+    # Close SQLite3 database connection
+    connect.close()
+    # Check if there are any books in the books table
+    if books:
+        # If there are books, print a header for the book information to the user
+        print("Books in the Library with Quantity of 1 or More:")
+        # Print a formatted header with column names to the user
+        print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format("ID", "Title", "Author", "ISBN", "Date", "Genre", "QTY"))
+        print("|" + "-" * 154 + "|")
+        for book in books:
+        # Print formatted information for each book in books table
+            print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format(*book))
+        print("|" + "-" * 154 + "|")
+
+        while True:
+            print("Options: 0-Main Menu, 1-Borrow Book")
+            user_choice = get_integer_input("Please select an option: ")
+            if user_choice == 0:
+                break
+            elif user_choice == 1:
+                borrow_book()
+            else:
+                print("Please select a valid option")
+    else:
+    # Error handling if no data in books table
+        print("No books available")
+def view_loans():
+    global current_user
+    connect, cursor = database_connection()
+    # Get the customer_id based on the current username
+    cursor.execute('''
+        SELECT customer_id FROM customer_accounts WHERE username = ?
+    ''', (current_user,))
+    customer_id = cursor.fetchone()[0]
+
+    # Query to retrieve all books on loan for the current customer
+    cursor.execute('''
+        SELECT transactions.transaction_id, books.book_id, books.title, books.author, transactions.borrow_date, transactions.return_date
+        FROM transactions
+        INNER JOIN books ON transactions.book_id = books.book_id
+        WHERE transactions.customer_id = ? AND transactions.date_returned IS NULL
+        
+    ''', (customer_id,))
+        # Fetch all rows from the result set
+    loans = cursor.fetchall()
+
+    
+    connect.close()
+
+    if loans: 
+        print("Current Books on Loan: ")  
+        # Print formatted table header
+        print("| {:<8} | {:<8} | {:<45} | {:<25} | {:<15} | {:<15} |".format(
+            "Trans ID", "Book ID", "Title", "Author", "Borrow Date", "Return Date"))
+        print("|" + "-" * 133 + "|")
+
+        # Print formatted table rows
+        for book in loans:
+            print("| {:<8} | {:<8} | {:<45} | {:<25} | {:<15} | {:<15} |".format(
+                book[0], book[1], book[2], book[3], book[4], book[5]))
+        print("|" + "-" * 133 + "|")
+        
+        while True:
+            print("Options: 0-Main Menu, 1-Return Book")
+            user_choice = get_integer_input("Please select an option: ")
+            if user_choice == 0:
+                break
+            elif user_choice == 1:
+                return_book()
+            else:
+                print("Please select a valid option")
+    else:
+        print("No books currently on loan")
+def borrow_book():
+    global current_user
+    connect, cursor = database_connection()
+    cursor.execute('SELECT customer_id FROM customer_accounts WHERE username = ?', (current_user,))
+    result = cursor.fetchone()
+    customer_id = result[0]
+    book_id = get_integer_input("Please enter the ID of book to borrow: ")
+    # Check if the book is available (quantity > 0)
+    cursor.execute('SELECT quantity FROM books WHERE book_id = ?', (book_id,))
+    result = cursor.fetchone()
+    if result is not None and result[0] > 0:
+        # Book is available, proceed with the transaction
+        borrow_date = datetime.now().strftime('%Y-%m-%d')
+        return_date = (datetime.now() + timedelta(days=14)).strftime('%Y-%m-%d')  # Assuming a 14-day borrowing period
+        # Insert the transaction record
+        cursor.execute('''
+            INSERT INTO transactions (customer_id, book_id, borrow_date, return_date)
+            VALUES (?, ?, ?, ?)
+        ''', (customer_id, book_id, borrow_date, return_date))
+        # Update the book quantity (subtract 1)
+        cursor.execute('UPDATE books SET quantity = quantity - 1 WHERE book_id = ?', (book_id,))
+        # Commit the changes to the database
+        connect.commit()
+        print(f"Book borrowed successfully. Return by: {return_date}")
+    else:
+        print("Sorry, the book is not available for borrowing.")
+def return_book():
+    connect, cursor = database_connection()
+    transaction_id = get_integer_input("Please enter transaction ID: ")
+    # Check if the transaction ID is valid
+    cursor.execute('SELECT * FROM transactions WHERE transaction_id = ?', (transaction_id,))
+    transaction = cursor.fetchone()
+    if transaction is not None and transaction[5] is None:  # Check if the book has not been returned already
+        # Update the transaction record with the return date
+        return_date = datetime.now().strftime('%Y-%m-%d')
+        cursor.execute('''
+            UPDATE transactions
+            SET date_returned = ?
+            WHERE transaction_id = ?
+        ''', (return_date, transaction_id))
+        # Update the book quantity (add 1)
+        cursor.execute('UPDATE books SET quantity = quantity + 1 WHERE book_id = ?', (transaction[2],))
+        # Commit the changes to the database
+        connect.commit()
+        connect.close()
+        print("Book returned successfully.")
+        view_loans()
+    elif transaction is not None and transaction[4] is not None:
+        print("Book has already been returned.")
+    else:
+        print("Invalid transaction ID.")
+
+
 if __name__ == "__main__":
     # Create tables in database if they do not exist
     create_tables()
@@ -663,6 +967,23 @@ if __name__ == "__main__":
                 else:
                     # Error handling for invald option selected
                     print("Please select a valid option")
+        elif user_choice == 2:
+            while True:
+                print('''Library Management System\n
+                    Welcome to the Customer Portal.\n
+                    1. Login
+                    2. Register
+                    0. Return to Main Menu
+                 ''')
+                customer_choice = get_integer_input("Please select an option: ")
 
+                if customer_choice == 0:
+                    break
+                elif customer_choice == 1:
+                    login("customer_accounts")
+                elif customer_choice == 2:
+                    customer_register()
+                else:
+                    print("Please select a valid option")
         else:
             print("Please select a valid option")
