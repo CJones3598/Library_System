@@ -508,13 +508,14 @@ def staff_main_menu():
                 4. Update Book Quantity
                 5. Update Book Information
                 6. Check Book Stock Status
-                7. Admin Functions
+                7. View All Loans
+                8. Admin Functions
                 0. Exit
             
                 \n\nCurrent user: ''',current_user
             )
         # Displays staff main menu and prompts user choice input
-        choice = get_integer_input("Enter your choice 0-6: ")
+        choice = get_integer_input("Enter your choice 0-8: ")
 
         if choice == 0:
             # Exit Program
@@ -539,6 +540,8 @@ def staff_main_menu():
             # Check the stock status of a book in the library
             check_book_status()
         elif choice == 7:
+            view_all_loans()
+        elif choice == 8:
             admin_menu()
         else:
             print("Please select a valid option.")
@@ -850,6 +853,38 @@ def check_book_status():
     else:
         # Error handling for book not found in table
         print(f"Book not found with ID: {book_id}")
+def view_all_loans():
+    connect, cursor = database_connection()
+    # Query to retrieve all books on loan for all customers
+    cursor.execute('''
+        SELECT ci.customer_id, ci.first_name || ' ' || ci.last_name AS full_name, t.transaction_id, b.book_id, b.title, t.borrow_date, t.return_date
+        FROM customer_information ci
+        INNER JOIN transactions t ON ci.customer_id = t.customer_id
+        INNER JOIN books b ON t.book_id = b.book_id
+        WHERE t.date_returned IS NULL
+    ''')
+    # Fetch all rows from the result set
+    loans = cursor.fetchall()
+    connect.close()
+    if loans:
+     print("All Books on Loan:")
+     print("| {:<10} | {:<25} | {:<10} | {:<8} | {:<45} | {:<15} | {:<15} |".format(
+         "Cust. ID", "Customer", "Trans. ID", "Book ID", "Title", "Borrow Date", "Return Date"))
+     print("|" + "-" * 148 + "|")
+     for loan in loans:
+         print("| {:<10} | {:<25} | {:<10} | {:<8} | {:<45} | {:<15} | {:<15} |".format(
+             loan[0], loan[1], loan[2], loan[3], loan[4], loan[5], loan[6]))
+     print("|" + "-" * 148 + "|")
+     while True:
+            print('\nOptions: 0:Main Menu')
+            user_option = get_integer_input("Please select an option: ")
+            # Exit the loop when 0 is selected and return to main menu
+            if user_option == 0:
+                break
+            else:
+                print("Please select a valid option")
+    else:
+      print("No books currently on loan for any customer.")
 
 # Library Functions for books - Customer Functions
 def view_available_books():
