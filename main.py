@@ -157,9 +157,9 @@ def hash_password(password):
 
 # Function for login system
 def login(account_type):
-    # Fetch global variable for the username of current logged in user
+    # Fetch global variable for the username of the current logged-in user
     global current_user
-    # Creates connection with SQLite3 database and creates cursor object
+    # Creates a connection with the SQLite3 database and creates a cursor object
     connect, cursor = database_connection()
     # Create a variable for login attempts
     attempts = 0
@@ -174,20 +174,20 @@ def login(account_type):
         cursor.execute(f'SELECT * FROM {account_type} WHERE username=? AND password=?', (username, hashed_password))
         # Fetch the result from the SELECT query
         account = cursor.fetchone()
-        # If the account is valid proceed with login
+        # If the account is valid, proceed with login
         if account:
             print("Login successful.")
             current_user = username
-            # Error Handling if the account is not valid
             break
         else:
             # Login Block calculations for attempts
             attempts += 1
             remaining_attempts = 5 - attempts
             print(f"Invalid username or password. Remaining attempts: {remaining_attempts}")
-    # Maximum Login attempt handling
-        print("Exceeded maximum login attempts. Closing the program.")
-        exit()
+            # Maximum Login attempt handling
+            if attempts >= 5:
+                print("Exceeded maximum login attempts. Closing the program.")
+                exit()
 
 # Functions for user account management
 def create_admin():
@@ -468,7 +468,6 @@ def remove_customer():
             print("Removal canceled.")
     else:
         print(f"Customer with ID {customer_id} not found.")
-
 def view_customer_accounts():
     connect, cursor = database_connection()
     # Perform a JOIN operation to retrieve information from both tables
@@ -499,21 +498,21 @@ def view_customer_accounts():
 
 # Functions for main menus and sub menus
 def staff_main_menu():
-    # Print Application Name and staff options to users for input
-    print('''Library Management System\n
-            Welcome to the Staff Portal.\n
-            1. View All Books
-            2. Add New Book
-            3. Delete Book
-            4. Update Book Quantity
-            5. Update Book Information
-            6. Check Book Stock Status
-            7. Admin Functions
-            0. Exit
-          
-            \n\nCurrent user: ''',current_user
-         )
-    while True:
+     while True:
+        # Print Application Name and staff options to users for input
+        print('''Library Management System\n
+                Welcome to the Staff Portal.\n
+                1. View All Books
+                2. Add New Book
+                3. Delete Book
+                4. Update Book Quantity
+                5. Update Book Information
+                6. Check Book Stock Status
+                7. Admin Functions
+                0. Exit
+            
+                \n\nCurrent user: ''',current_user
+            )
         # Displays staff main menu and prompts user choice input
         choice = get_integer_input("Enter your choice 0-6: ")
 
@@ -628,6 +627,34 @@ def customer_main_menu():
             change_password("customer_accounts")
         else:
             print("Please select a valid option.")
+def options_menu():
+    # Print options to user
+    while True:
+        print('\nOptions: \n 0:Main Menu, 1:View All, 2:Borrow Book, 3:Sort, 4:Filter')
+        user_option = get_integer_input("Please select an option: ")
+        # Exit the loop when 0 is selected and return to main menu
+        if user_option == 0:
+            break
+        elif user_option == 1:
+            view_available_books()
+            break
+        elif user_option == 2:
+            borrow_book()
+            view_available_books()
+            break
+        elif user_option == 3:
+            print('''Attribute: 1:Title, 2:Author, 3:ISBN, 4:Pub Date, 5:Genre, 6:Quantity\nSort Order: 1: Ascending, 2: Descending ''')
+            attribute = get_integer_input("Enter the attribute to sort by: ")
+            order = get_integer_input("Enter the order to sort by: ")
+            sort_books(attribute, order, 'quantity >=1')
+        elif user_option == 4:
+            print('''Attribute: 1:Title, 2:Author, 3:ISBN, 4:Pub Date, 5:Genre''')
+            filter_attribute = get_integer_input("Enter the attribute to filter by: ")
+            filter_value = input("Enter the value to filter by: ")
+            filter_books(filter_attribute, filter_value)
+        else:
+            # Error handling for incorrect option
+            print('Please enter a valid option')
 
 # Library Functions for books - Staff Functions
 def view_all_books():
@@ -647,10 +674,35 @@ def view_all_books():
         # If there are books, print a header for the book information to the user
         print("All Books in the Library:")
         # Print a formatted header with column names to the user
-        print("{:<5} {:<25} {:20} {:<15} {:<12} {:<30} {:<8}".format("ID", "Title", "Author", "ISBN", "Date", "Genre", "Quantity"))
+        print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format("ID", "Title", "Author", "ISBN", "Date", "Genre", "QTY"))
+        print("|" + "-" * 154 + "|")
         for book in books:
             # Print formatted information for each book in books table
-            print("{:<5} {:<25} {:<20} {:<15} {:<12} {:<30} {:<8}".format(*book))
+            print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format(*book))
+        print("|" + "-" * 154 + "|")
+        # Print options to user
+        while True:
+            print('\nOptions: \n 0:Main Menu, 1:View All, 2:Borrow Book, 3:Sort, 4:Filter')
+            user_option = get_integer_input("Please select an option: ")
+            # Exit the loop when 0 is selected and return to main menu
+            if user_option == 0:
+                break
+            elif user_option == 1:
+                view_all_books()
+                break
+            elif user_option == 2:
+                print('''Attribute: 1:Title, 2:Author, 3:ISBN, 4:Pub Date, 5:Genre, 6:Quantity\nSort Order: 1: Ascending, 2: Descending ''')
+                attribute = get_integer_input("Enter the attribute to sort by: ")
+                order = get_integer_input("Enter the order to sort by: ")
+                sort_books(attribute, order, 'quantity >=1')
+            elif user_option == 3:
+                print('''Attribute: 1:Title, 2:Author, 3:ISBN, 4:Pub Date, 5:Genre''')
+                filter_attribute = get_integer_input("Enter the attribute to filter by: ")
+                filter_value = input("Enter the value to filter by: ")
+                filter_books(filter_attribute, filter_value)
+            else:
+                # Error handling for incorrect option
+                print('Please enter a valid option')
     else:
         # Error handling if no data in books table
         print("No books found in the library.")
@@ -801,7 +853,7 @@ def check_book_status():
 
 # Library Functions for books - Customer Functions
 def view_available_books():
-    while True:
+
         # Creates connection with SQLite3 database and creates cursor object
         connect, cursor = database_connection()
         # Execute a SELECT query to retrieve columns and data from the books table
@@ -825,16 +877,7 @@ def view_available_books():
                 # Print formatted information for each book in books table
                 print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format(*book))
             print("|" + "-" * 154 + "|")
-
-            print("Options: 0-Main Menu, 1-Borrow Book")
-            user_choice = get_integer_input("Please select an option: ")
-            if user_choice == 0:
-                break
-            elif user_choice == 1:
-                borrow_book()
-
-            else:
-                print("Please select a valid option")
+            options_menu()
         else:
             # Error handling if no data in books table
             print("No books available")
@@ -936,6 +979,86 @@ def return_book():
         print("Book has already been returned.")
     else:
         print("Invalid transaction ID.")
+
+# Library Functions for sorting and filtering books - Staff & Customer Functions
+def sort_books(attribute=1, order=1, condition=''):
+    # Create a connection with the SQLite3 database and create a cursor object
+    connect, cursor = database_connection()
+
+    # Map numbers to sorting attributes and orders
+    attribute_mapping = {1: 'title', 2: 'author', 3: 'isbn', 4: 'pub_date', 5: 'genre', 6: 'quantity'}
+    order_mapping = {1: 'ASC', 2: 'DESC'}
+    
+    # Validate and set the sorting attribute
+    if attribute not in attribute_mapping:
+        print("Invalid sorting attribute. Defaulting to sorting by name.")
+        attribute = 1
+    
+    # Validate and set the sorting order
+    if order not in order_mapping:
+        print("Invalid sorting order. Defaulting to ascending order.")
+        order = 1
+    
+    # Assign values to be passed to SELECT query
+    attribute_name = attribute_mapping[attribute]
+    order_direction = order_mapping[order]
+    
+    # Add condition if provided
+    if condition:
+        condition = f' WHERE {condition}'
+    
+    # Execute a SELECT query to retrieve sorted columns from the books table
+    cursor.execute(f'''
+        SELECT book_id, title, author, isbn, pub_date, genre, quantity
+        FROM books
+        {condition}
+        ORDER BY ({attribute_name}) {order_direction} 
+    ''')
+    
+    # Fetch all results from SELECT query
+    sorted_books = cursor.fetchall()
+    
+    # Close the database connection
+    connect.close()
+    
+    # Display sorted data from SELECT query to the user
+    print(f"Sorted Library by {attribute_name.capitalize()} ({order_direction.capitalize()}ending Order):")
+    print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format("ID", "Title", "Author", "ISBN", "Date", "Genre", "QTY"))
+    print("|" + "-" * 154 + "|")
+    for book in sorted_books:
+        # Print formatted information for each book in books table
+        print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format(*book))
+    print("|" + "-" * 154 + "|")
+def filter_books(filter_attribute=1, filter_value=''):
+    # Create a connection with the SQLite3 database and create a cursor object
+    connect, cursor = database_connection()
+    # Map numbers to filter attributes
+    filter_mapping = {1: 'title', 2: 'author', 3: 'isbn', 4: 'pub_date', 5: 'genre'}
+    # Validate and set the filtering attribute
+    if filter_attribute not in filter_mapping:
+        print("Invalid filter attribute. Defaulting to filter by name.")
+        filter_attribute = 1
+    # Assign values to be passed to SELECT query
+    attribute_filter = filter_mapping[filter_attribute]
+    # Execute a SELECT query to retrieve filtered columns from the books table
+    cursor.execute(f'''
+        SELECT * FROM books
+        WHERE LOWER({attribute_filter}) LIKE ?
+    ''', ('%' + filter_value.lower() + '%',))
+    # Fetch all results from SELECT query
+    filtered_books = cursor.fetchall()
+     # Close the database connection
+    connect.close()
+    # Display sorted data from SELECT query to user
+    if not filtered_books:
+        print("No books found with the given filter.")
+    else:
+        print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format("ID", "Title", "Author", "ISBN", "Date", "Genre", "QTY"))
+        print("|" + "-" * 154 + "|")
+        for book in filtered_books:
+        # Print formatted information for each book in books table
+            print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format(*book))
+        print("|" + "-" * 154 + "|")
 
 
 if __name__ == "__main__":
