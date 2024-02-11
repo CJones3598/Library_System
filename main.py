@@ -682,7 +682,7 @@ def view_all_books():
         print("|" + "-" * 154 + "|")
         # Print options to user
         while True:
-            print('\nOptions: \n 0:Main Menu, 1:View All, 2:Borrow Book, 3:Sort, 4:Filter')
+            print('\nOptions: \n 0:Main Menu, 1:View All, 2:Sort, 3:Filter')
             user_option = get_integer_input("Please select an option: ")
             # Exit the loop when 0 is selected and return to main menu
             if user_option == 0:
@@ -1022,7 +1022,7 @@ def sort_books(attribute=1, order=1, condition=''):
     connect.close()
     
     # Display sorted data from SELECT query to the user
-    print(f"Sorted Library by {attribute_name.capitalize()} ({order_direction.capitalize()}ending Order):")
+    print(f"Sorted Library by {attribute_name.upper()} ({order_direction.capitalize()}ending Order):")
     print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format("ID", "Title", "Author", "ISBN", "Date", "Genre", "QTY"))
     print("|" + "-" * 154 + "|")
     for book in sorted_books:
@@ -1053,6 +1053,7 @@ def filter_books(filter_attribute=1, filter_value=''):
     if not filtered_books:
         print("No books found with the given filter.")
     else:
+        print(f"Filter Library by {attribute_filter.upper()} for {filter_value.upper()}:")
         print("| {:<5} | {:<45} | {:<28} | {:<15} | {:<12} | {:<25} | {:<4} |".format("ID", "Title", "Author", "ISBN", "Date", "Genre", "QTY"))
         print("|" + "-" * 154 + "|")
         for book in filtered_books:
