@@ -211,7 +211,8 @@ def create_admin():
     admin_exists = cursor.fetchone()
     # If admin account doesnt exist, create one
     if not admin_exists:
-        cursor.execute('INSERT INTO staff_accounts VALUES (?, ?, ?, ?)', (username, hashed_password, "5", "0"))
+        cursor.execute('INSERT INTO staff_information VALUES (?, ?, ?, ?)', ("1", "admin" "admin", "admin"))
+        cursor.execute('INSERT INTO staff_accounts VALUES (?, ?, ?, ?)', (username, hashed_password, "5", "1"))
         print("Administrator account created with username 'ADMIN' and password 'ADMIN'\nPlease change the password after login.")
         # Commit the changes and close the connection to SQLite database
         connect.commit()
