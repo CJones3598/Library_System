@@ -369,9 +369,14 @@ def login(account_type):
     # Login block for more than 5 invalid logins
     while attempts < 5:
         clear_screen()
-        print("Login: \n")
+        print("Library System Login: \n Enter 'exit' to exit to Main Menu\n")
         # Take user input for username and password
         username = get_valid_input("Enter Username: ")
+        # Error handling to cancel login
+        if username.lower() == 'exit':
+            print("Login Cancelled. Returning to Main Menu.")
+            time.sleep(2)
+            return False
         password = get_valid_input("Enter Password: ")
         # Hash the password for comparison
         hashed_password = hash_password(password)
@@ -384,7 +389,7 @@ def login(account_type):
             print("Login Successful.")
             time.sleep(2)
             current_user = username
-            break
+            return True
         else:
             # Login Block calculations for attempts
             attempts += 1
@@ -1249,6 +1254,8 @@ if __name__ == "__main__":
         user_choice = get_integer_input("Select an Option: ")
         # Exit Program
         if user_choice == 0:
+            print("Exiting Program.")
+            time.sleep(2)
             break
         # Staff Login Portal with options
         elif user_choice == 1:
@@ -1265,8 +1272,8 @@ if __name__ == "__main__":
                     break
                 # Login page for staff accounts
                 elif staff_choice == 1:
-                    login("staff_accounts")
-                    staff_main_menu()
+                    if login("staff_accounts"):
+                        staff_main_menu()
                     break
                 else:
                     # Error handling for invald option selected
@@ -1288,8 +1295,8 @@ if __name__ == "__main__":
                     break
                 # Login page for customer accounts
                 elif customer_choice == 1:
-                    login("customer_accounts")
-                    customer_main_menu()
+                    if login("customer_accounts"):
+                        customer_main_menu()
                     break
                 # Register page for new customers
                 elif customer_choice == 2:
